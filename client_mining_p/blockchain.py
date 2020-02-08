@@ -67,7 +67,6 @@ class Blockchain(object):
         # Create the block_string
         block_string = json.dumps(block, sort_keys=True).encode()
 
-        # TODO: Hash this string using sha256
         hash = hashlib.sha256(block_string).hexdigest()
         # By itself, the sha256 function returns the hash in a raw string
         # that will likely include escaped characters.
@@ -118,18 +117,24 @@ def mine():
         "message": "Not permitted"
       }
       return jsonify(response), 400
+
     
-    previous_hash = blockchain.hash(blockchain.last_block)
-    if data['proof'] == previous_hash:
+    block_string = json.dumps(blockchain.last_block, sort_keys=True).encode()
+    
+    if (blockchain.valid_proof(block_string, data['proof'])):
+      previous_hash = blockchain.hash(blockchain.last_block)
+      new_block = blockchain.new_block(data['proof'], previous_hash)
       response = {
-        "message": "Not permitted"
+        "previous_hash": previous_hash,
+        "message": "New Block Forged",
+        "new_block": new_block
       }
-      return jsonify(response), 400
-    new_block = blockchain.new_block(data['proof'], previous_hash)
-    response = {
-      "message": "New Block Forged"
-    }
-    return jsonify(response), 200
+      return jsonify(response), 200
+    else: 
+      response = {
+        "message": "Duplicate"
+      }
+      return jsonify(response), 200
 
 
 @app.route('/chain', methods=['GET'])
