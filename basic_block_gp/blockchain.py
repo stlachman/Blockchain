@@ -123,31 +123,21 @@ node_identifier = str(uuid4()).replace('-', '')
 blockchain = Blockchain()
 
 
-@app.route('/mine', methods=['POST'])
+@app.route('/mine', methods=['GET'])
 def mine():
-    data = request.get_json()
-    if ("id" not in data or "proof" not in data):
-      response = {
-        "message": "Not permitted"
-      }
-      return jsonify(response), 400
-    response = {
-      "message": "New Block Forged"
-    }
-    return jsonify(response), 200
     # Run the proof of work algorithm to get the next proof
-    # proof = blockchain.proof_of_work(blockchain.last_block)
+    proof = blockchain.proof_of_work(blockchain.last_block)
 
     # # Forge the new Block by adding it to the chain with the proof
-    # previous_hash = blockchain.hash(blockchain.last_block)
-    # new_block = blockchain.new_block(proof, previous_hash)
+    previous_hash = blockchain.hash(blockchain.last_block)
+    new_block = blockchain.new_block(proof, previous_hash)
 
-    # response = {
-    #     # Send a JSON response with the new block
-    #     'block': new_block
-    # }
+    response = {
+        # Send a JSON response with the new block
+        'block': new_block
+    }
 
-    # return jsonify(response), 200
+    return jsonify(response), 200
 
 
 @app.route('/chain', methods=['GET'])
