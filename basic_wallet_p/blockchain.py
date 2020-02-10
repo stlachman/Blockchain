@@ -6,6 +6,7 @@ from time import time
 from uuid import uuid4
 
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 
 DIFFICULTY = 1
 
@@ -97,10 +98,24 @@ class Blockchain(object):
         guess_hash = hashlib.sha256(guess).hexdigest()
         
         return guess_hash[:DIFFICULTY] == "0" * DIFFICULTY
-
+    
+    def new_transaction(self, sender, recipient, amount):
+      """
+      :param sender: <str> Address of the Recipient
+      :param recipient: <str> Address of the Recipient
+      :param amount: <int> Amount
+      :return: <int> The index of the `block` that will hold this transaction
+      """
+      self.current_transactions.append({
+        'sender': sender,
+        'recipient': recipient,
+        'amount': amount
+      })
 
 # Instantiate our Node
 app = Flask(__name__)
+
+CORS(app)
 
 # Generate a globally unique address for this node
 node_identifier = str(uuid4()).replace('-', '')
@@ -109,14 +124,42 @@ node_identifier = str(uuid4()).replace('-', '')
 blockchain = Blockchain()
 
 
+# * use `request.get_json()` to pull the data out of the POST
+# * check that 'sender', 'recipient', and 'amount' are present
+    # * return a 400 error using `jsonify(response)` with a 'message'
+#* upon success, return a 'message' indicating index of the block containing the transaction
+
+@app.route('/transactions/new', methods=['POST'])
+def post_new_transaction():
+  try:
+    data = request.get_json()
+  except ValueError:
+    print("Error: Non-json response")
+    print("Response returned:")
+    print(request)
+    return "Error"
+
+  if ("sender" not in data or "recipient" not in data or "amount" not in data):
+    response = {
+      "message": "Missing values"
+    }
+    return jsonify(response), 400
+
+  blockchain.new_transaction(data['sender'], data['recipient'], data['amount'])
+  message = {
+    "block_index": blockchain.last_block['index'],
+    "block": blockchain.last_block
+  }
+  return jsonify(message), 201
+
 @app.route('/mine', methods=['POST'])
 def mine():
     data = request.get_json()
     if ("id" not in data or "proof" not in data):
-      response = {
+      message = {
         "message": "Not permitted"
       }
-      return jsonify(response), 400
+      return jsonify(message), 400
 
     
     block_string = json.dumps(blockchain.last_block, sort_keys=True).encode()
@@ -124,6 +167,7 @@ def mine():
     if (blockchain.valid_proof(block_string, data['proof'])):
       previous_hash = blockchain.hash(blockchain.last_block)
       new_block = blockchain.new_block(data['proof'], previous_hash)
+      blockchain.new_transaction("0", data['id'], 1)
       response = {
         "message": "New Block Forged",
         "new_block": new_block
@@ -131,9 +175,9 @@ def mine():
       return jsonify(response), 200
     else: 
       response = {
-        "message": "Proof is either invalid or a duplicate proof"
+        "message": "Duplicate"
       }
-      return jsonify(response), 400
+      return jsonify(response), 200
 
 
 @app.route('/chain', methods=['GET'])
@@ -147,6 +191,30 @@ def full_chain():
 
 @app.route('/last_block', methods=['GET'])
 def last_block():
+    response = {
+        'last_block': blockchain.last_block
+    }
+    return jsonify(response), 200
+
+
+@app.route('/transactions/<id>', methods=['GET'])
+def get_transactions_by_id(id):
+    user_transactions = []
+
+    for block in blockchain.chain:
+      if block['transactions']:
+        for transaction in block['transactions']:
+          if transaction['sender'] == id or transaction['recipient'] == id:
+            user_transactions.append(transaction)
+    response = {
+      'user_transactions': user_transactions
+    }
+
+    return jsonify(response), 200
+        
+
+
+
     response = {
         'last_block': blockchain.last_block
     }
